@@ -10,70 +10,83 @@ namespace CCEC
     public static class Species
     {
         //match chemical names to characteristics
-        public static Dictionary<string, (byte H, byte C, byte N, byte O, byte F, float molecularMass, float[] a, float[] b)> properties = new()
+        public static Dictionary<string, (byte H, byte C, byte N, byte O, byte F, float molecularMass, float[] a, float[] b, bool reactantOnly)> properties = new()
         {
-            //{"H", (1,0,0,0,0},
-            //{"H2", (2,0,0,0,0)},
-//
-            //{"C", (0,1,0,0,0)},
-            //{"N", (0,0,1,0,0)},
-            //{"N2", (0,0,2,0,0)},
-            //
-            //{"O", (0,0,0,1,0)},
-            //{"O2", (0,0,0,2,0)},
-            //
-            //{"F", (0,0,0,0,1)},
-            //{"F2", (0,0,0,0,2)},
-//
-            ////hydrogen-carbon compounds
-            //{"CH", (1,1,0,0,0)},
-            //{"CH2", (2,1,0,0,0)},
-            //{"CH3", (3,1,0,0,0)},
-            //{"CH4", (4,1,0,0,0)}, //methane
-//
-            ////hydrogen-nitrogen compounds
-            //{"N2H4", (4,0,2,0,0)}, //hydrazine
-            //{"NH", (1,0,1,0,0)},
-            //{"NH2", (2,0,1,0,0)},
-            //{"NH3", (3,0,1,0,0)}, //ammonia
-//
-            ////hydrogen-oxygen compounds
-            //{"OH", (1,0,0,1,0)},
-            //{"H2O", (2,0,0,1,0)},
-//
-            ////hydrogen-fluorine compounds
-            //{"HF", (1,0,0,0,1)},
-//
-            ////carbon-nitrogen compounds
-            //{"CN", (0,1,1,0,0)},
-//
-            ////carbon-oxygen compounds
-            //{"CO", (0,1,0,1,0)},
-            //{"CO2", (0,1,0,2,0)},
-//
-            ////carbon-oxygen-fluorine compounds
-            //{"COF2", (0,1,0,1,2)},
-//
-            ////carbon-fluorine compounds
-            //{"CF2", (0,1,0,0,2)},
-            //{"C2F4", (0,2,0,0,4)},
-            //{"CF4", (0,1,0,0,4)},
-            //{"C2F6", (0,2,0,0,6)},
-            //
-            ////nitrogen-oxygen compounds
-            //{"NO", (0,0,1,1,0)},
-            //{"N2O", (0,0,2,1,0)},
-            //{"NO2", (0,0,1,2,0)},
-            //{"N2O4", (0,0,2,4,0)}, //NTO
-//
-            ////nitrogen-fluorine compounds
-            //{"NF3", (0,0,1,0,3)},
-//
-            ////oxygen-fluorine compounds
-            //{"OF2", (0,0,0,1,2)},
+            {"H", GetData("H")},
+            {"H2", GetData("H2")},
+
+            {"C", GetData("C")},
+
+            {"N", GetData("N")},
+            {"N2", GetData("N2")},
+            
+            {"O", GetData("O")},
+            {"O2", GetData("O2")},
+            
+            {"F", GetData("F")},
+            {"F2", GetData("F2")},
+
+            //hydrogen-carbon compounds
+            {"CH", GetData("CH")},
+            {"CH2", GetData("CH2")},
+            {"CH3", GetData("CH3")},
+            {"CH4", GetData("CH4")}, //methane
+
+            //hydrogen-nitrogen compounds
+            {"N2H4", GetData("N2H4")}, //hydrazine
+            {"NH", GetData("NH")},
+            {"NH2", GetData("NH2")},
+            {"NH3", GetData("NH3")}, //ammonia
+
+            //hydrogen-nitrogen-oxygen compounds
+            {"HNO3", GetData("HNO3")}, //nitric acid
+
+            //hydrogen-oxygen compounds
+            {"OH", GetData("OH")},
+            {"H2O", GetData("H2O")},
+            {"H2O2", GetData("H2O2")},
+
+            //hydrogen-fluorine compounds
+            {"HF", GetData("HF")},
+
+            //carbon-nitrogen compounds
+            {"CN", GetData("CN")},
+
+            //carbon-oxygen compounds
+            {"CO", GetData("CO")},
+            {"CO2", GetData("CO2")},
+
+            //carbon-oxygen-fluorine compounds
+            {"COF2", GetData("COF2")},
+
+            //carbon-fluorine compounds
+            {"CF2", GetData("CF2")},
+            {"C2F4", GetData("C2F4")},
+            {"CF4", GetData("CF4")},
+            {"C2F6", GetData("C2F6")},
+            
+            //nitrogen-oxygen compounds
+            {"NO", GetData("NO")},
+            {"N2O", GetData("N2O")},
+            {"NO2", GetData("NO2")},
+            {"N2O4", GetData("N2O4")}, //NTO
+
+            //nitrogen-fluorine compounds
+            {"NF3", GetData("NF3")},
+
+            //oxygen-fluorine compounds
+            {"F2O", GetData("F2O")},
+
+            //reactant-only
+            {"C12H26", (26,12,0,0,0, 170.33f, new float[0], new float[0], true)}, //RP1 surrogate
+            {"C2H8N2", (8,2,2,0,0, 60.0983f, new float[0], new float[0], true)}, //UDMH
+            {"CH6N2", (6,1,2,0,0, 46.073f, new float[0], new float[0], true)}, //MMH
+            {"C6H5NH2", (7,6,1,0,0, 93.129f, new float[0], new float[0], true)}, //Aniline
+
+
         };
 
-        public static (float molecularMass, float[] a, float[] b, byte H, byte C, byte N, byte O, byte F) GetData(string elementName)
+        public static (byte H, byte C, byte N, byte O, byte F, float molecularMass, float[] a, float[] b, bool reactantOnly) GetData(string elementName) //notably doesn't return correct element values if any element exceeds a count of 9
         {
             string path = Path.Combine(Application.streamingAssetsPath, "NasaData.txt");
             string[] textLines = File.ReadAllLines(path);
@@ -157,7 +170,59 @@ namespace CCEC
                 b[i] = Convert.ToSingle(dataString[i+7]);
             }
 
-            return (Convert.ToSingle(textLines[elementLine+8]), a, b, 0,0,0,0,0); //TODO: returns 0 on all element counts; fix later
+            //initialize element counts
+            byte H = 0;
+            byte C = 0;
+            byte N = 0;
+            byte O = 0;
+            byte F = 0;
+
+            for(int i=0; i<5; i++)
+            {
+                char elementChar = textLines[elementLine+2+i][textLines[elementLine+2+i].Length-1];
+                byte number = Convert.ToByte(Convert.ToString(textLines[elementLine+3+i][0])); //have to convert to string cause char converts to the ascii code
+
+                if(elementChar == '0')
+                {
+                    i=5;
+                    break;
+                }
+
+                switch (elementChar)
+                {
+                    case 'H':
+                    H += number;
+                    break;
+                    case 'C':
+                    C += number;
+                    break;
+                    case 'N':
+                    N += number;
+                    break;
+                    case 'O':
+                    O += number;
+                    break;
+                    case 'F':
+                    F += number;
+                    break;
+                    default:
+                    Debug.Log($"Element '{elementChar}' not permitted");
+                    break;
+                }
+            }
+
+            return (H,C,N,O,F, Convert.ToSingle(textLines[elementLine+8]), a, b, true);
+        }
+
+        public static (float heatCapacity, float enthalpy, float entropy) ThermodynamicProperties(float[] a, float[] b, float T)
+        {
+            float R = 8.314462618f; //gas constant
+
+            float heatCapacity = R*(a[0]*MathF.Pow(T, -2) + a[1]*MathF.Pow(T, -1) + a[2] + a[3]*T + a[4]*MathF.Pow(T, 2) + a[5]*MathF.Pow(T, 3) + a[6]*MathF.Pow(T, 4));
+            float enthalpy = R*T*(-a[0]*MathF.Pow(T, -2) + a[1]*MathF.Log(T)/T + a[2] + a[3]*T/2 + a[4]*MathF.Pow(T, 2)/3 + a[5]*MathF.Pow(T, 3)/4 + a[6]*MathF.Pow(T, 4)/5 + b[0]/T);
+            float entropy = R*(-a[0]*MathF.Pow(T, -2)/2 - a[1]*MathF.Pow(T, -1) + a[2]*MathF.Log(T) + a[3]*T + a[4]*MathF.Pow(T, 2)/2 + a[5]*MathF.Pow(T, 3)/3 + a[6]*MathF.Pow(T, 4)/4 + b[1]);
+
+            return (heatCapacity, enthalpy, entropy);
         }
     }
-}
+}   
