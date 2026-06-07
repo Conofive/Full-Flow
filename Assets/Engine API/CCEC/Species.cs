@@ -10,7 +10,7 @@ namespace CCEC
     public static class Species
     {
         //match chemical names to characteristics
-        public static Dictionary<string, (byte H, byte C, byte N, byte O, byte F, float molecularMass, float[] a, float[] b)> properties = new() //TODO: Instead of this, make a different system that takes the numbers from the database. Make an array to define the allowed elements.
+        public static Dictionary<string, (byte H, byte C, byte N, byte O, byte F, float molecularMass, float[] a, float[] b)> properties = new()
         {
             //{"H", (1,0,0,0,0},
             //{"H2", (2,0,0,0,0)},
@@ -30,10 +30,6 @@ namespace CCEC
             //{"CH2", (2,1,0,0,0)},
             //{"CH3", (3,1,0,0,0)},
             //{"CH4", (4,1,0,0,0)}, //methane
-            //{"C12H26", (26,12,0,0,0)}, //RP1 approximation
-//
-            ////hydrogen-carbon-nitrogen compounds
-            //{"H8N2C2", (8,2,2,0,0)}, //UDMH
 //
             ////hydrogen-nitrogen compounds
             //{"N2H4", (4,0,2,0,0)}, //hydrazine
@@ -77,7 +73,7 @@ namespace CCEC
             //{"OF2", (0,0,0,1,2)},
         };
 
-        public static (float molecularMass, float[] a, float[] b) GetData(string elementName)
+        public static (float molecularMass, float[] a, float[] b, byte H, byte C, byte N, byte O, byte F) GetData(string elementName)
         {
             string path = Path.Combine(Application.streamingAssetsPath, "NasaData.txt");
             string[] textLines = File.ReadAllLines(path);
@@ -104,7 +100,7 @@ namespace CCEC
                 }
             }
 
-            //Doesn't work because sometimes the line starts with a negative and it ruins everything so i added the "add" crap
+            //Doesn't work because sometimes the line starts with a negative and it ruins everything so i added the "+ add stuff"; zip ties
             string[] dataString = new string[9];
             int add = 0;
             if(textLines[dataLine][0] == '-')
@@ -138,7 +134,7 @@ namespace CCEC
                 {
                     if(dataString[i][j] == 'D')
                     {
-                        char[] charArray = new char[dataString[i].Length]; //surely theres a better wayyy
+                        char[] charArray = new char[dataString[i].Length];
                         for(int k=0; k<charArray.Length; k++)
                         {
                             charArray[k] = dataString[i][k];
@@ -161,7 +157,7 @@ namespace CCEC
                 b[i] = Convert.ToSingle(dataString[i+7]);
             }
 
-            return (Convert.ToSingle(textLines[elementLine+8]), a, b);
+            return (Convert.ToSingle(textLines[elementLine+8]), a, b, 0,0,0,0,0); //TODO: returns 0 on all element counts; fix later
         }
     }
 }
