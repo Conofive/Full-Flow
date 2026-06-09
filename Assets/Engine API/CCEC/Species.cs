@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
 
 namespace CCEC
@@ -10,7 +8,7 @@ namespace CCEC
     public static class Species
     {
         //match chemical names to characteristics
-        public static Dictionary<string, (byte H, byte C, byte N, byte O, byte F, float molecularMass, float[] a, float[] b, bool reactantOnly)> properties = new()
+        public static Dictionary<string, (byte H, byte C, byte N, byte O, byte F, double molecularMass, double[] a, double[] b, bool reactantOnly)> properties = new()
         {
             {"H", GetData("H")},
             {"H2", GetData("H2")},
@@ -77,16 +75,16 @@ namespace CCEC
             //oxygen-fluorine compounds
             {"F2O", GetData("F2O")},
 
-            //reactant-only
-            {"C12H26", (26,12,0,0,0, 170.33f, new float[0], new float[0], true)}, //RP1 surrogate
-            {"C2H8N2", (8,2,2,0,0, 60.0983f, new float[0], new float[0], true)}, //UDMH
-            {"CH6N2", (6,1,2,0,0, 46.073f, new float[0], new float[0], true)}, //MMH
-            {"C6H5NH2", (7,6,1,0,0, 93.129f, new float[0], new float[0], true)}, //Aniline
+            //reactant only - implement elsewhere because it won't work having this in the main dictionary
+            //{"C12H26", (26,12,0,0,0, 170.33f, new double[0], new double[0], true)}, //RP1 surrogate
+            //{"C2H8N2", (8,2,2,0,0, 60.0983f, new double[0], new double[0], true)}, //UDMH
+            //{"CH6N2", (6,1,2,0,0, 46.073f, new double[0], new double[0], true)}, //MMH
+            //{"C6H5NH2", (7,6,1,0,0, 93.129f, new double[0], new double[0], true)}, //Aniline
 
 
         };
 
-        public static (byte H, byte C, byte N, byte O, byte F, float molecularMass, float[] a, float[] b, bool reactantOnly) GetData(string elementName) //notably doesn't return correct element values if any element exceeds a count of 9
+        public static (byte H, byte C, byte N, byte O, byte F, double molecularMass, double[] a, double[] b, bool reactantOnly) GetData(string elementName) //notably doesn't return correct element values if any element exceeds a count of 9
         {
             string path = Path.Combine(Application.streamingAssetsPath, "NasaData.txt");
             string[] textLines = File.ReadAllLines(path);
@@ -158,13 +156,13 @@ namespace CCEC
                 }
             }
 
-            float[] a = new float[7];
+            double[] a = new double[7];
             
             for(int i=0; i<7; i++)
             {
                 a[i] = Convert.ToSingle(dataString[i]);
             }
-            float[] b = new float[2];
+            double[] b = new double[2];
             for(int i=0; i<2; i++)
             {
                 b[i] = Convert.ToSingle(dataString[i+7]);
@@ -211,16 +209,16 @@ namespace CCEC
                 }
             }
 
-            return (H,C,N,O,F, Convert.ToSingle(textLines[elementLine+8]), a, b, true);
+            return (H,C,N,O,F, Convert.ToSingle(textLines[elementLine+8]), a, b, false);
         }
 
-        public static (float heatCapacity, float enthalpy, float entropy) ThermodynamicProperties(float[] a, float[] b, float T)
+        public static (double heatCapacity, double enthalpy, double entropy) ThermodynamicProperties(double[] a, double[] b, double T)
         {
-            float R = 8.314462618f; //gas constant
+            double R = 8.314462618f; //gas constant
 
-            float heatCapacity = R*(a[0]*MathF.Pow(T, -2) + a[1]*MathF.Pow(T, -1) + a[2] + a[3]*T + a[4]*MathF.Pow(T, 2) + a[5]*MathF.Pow(T, 3) + a[6]*MathF.Pow(T, 4));
-            float enthalpy = R*T*(-a[0]*MathF.Pow(T, -2) + a[1]*MathF.Log(T)/T + a[2] + a[3]*T/2 + a[4]*MathF.Pow(T, 2)/3 + a[5]*MathF.Pow(T, 3)/4 + a[6]*MathF.Pow(T, 4)/5 + b[0]/T);
-            float entropy = R*(-a[0]*MathF.Pow(T, -2)/2 - a[1]*MathF.Pow(T, -1) + a[2]*MathF.Log(T) + a[3]*T + a[4]*MathF.Pow(T, 2)/2 + a[5]*MathF.Pow(T, 3)/3 + a[6]*MathF.Pow(T, 4)/4 + b[1]);
+            double heatCapacity = R*(a[0]*Math.Pow(T, -2) + a[1]*Math.Pow(T, -1) + a[2] + a[3]*T + a[4]*Math.Pow(T, 2) + a[5]*Math.Pow(T, 3) + a[6]*Math.Pow(T, 4));
+            double enthalpy = R*T*(-a[0]*Math.Pow(T, -2) + a[1]*Math.Log(T)/T + a[2] + a[3]*T/2 + a[4]*Math.Pow(T, 2)/3 + a[5]*Math.Pow(T, 3)/4 + a[6]*Math.Pow(T, 4)/5 + b[0]/T);
+            double entropy = R*(-a[0]*Math.Pow(T, -2)/2 - a[1]*Math.Pow(T, -1) + a[2]*Math.Log(T) + a[3]*T + a[4]*Math.Pow(T, 2)/2 + a[5]*Math.Pow(T, 3)/3 + a[6]*Math.Pow(T, 4)/4 + b[1]);
 
             return (heatCapacity, enthalpy, entropy);
         }
