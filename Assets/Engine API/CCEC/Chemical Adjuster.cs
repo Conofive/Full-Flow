@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Complex;
 using MathNet.Numerics.LinearAlgebra.Factorization;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace CCEC
@@ -15,7 +16,7 @@ namespace CCEC
         {
             Matrix<double> elementMatrix = LinearAlgebra.A;
             double tolerance = 1e-5;
-            int maxIterations = 10000;
+            int maxIterations = 1000;
 
             int m = elementMatrix.RowCount;
             int n = elementMatrix.ColumnCount;
@@ -92,7 +93,7 @@ namespace CCEC
                 Vector<double> gramResidual = gram*lambda - correctionTarget;
                 if(gramResidual.L2Norm() > tolerance)
                 {
-                    Debug.Log("Problem");
+                    return null;
                 }
 
                 Vector<double> correction = AFree.TransposeThisAndMultiply(lambda);
@@ -124,7 +125,6 @@ namespace CCEC
                     return Clean(result, tolerance);
                 }
             }
-            Debug.Log("Badd!!");
             return null;
         }
         
@@ -139,6 +139,151 @@ namespace CCEC
                 }
             }
             return cleaned;
+        }
+
+        static double ComputeEnergy(Vector<double> species, double pressurePa, double tempK)
+        {
+            double R = 8.314462618; //gas constant
+            double referencePressure = 101325; //1 atmosphere
+
+            var speciesList = Species.properties.ToList(); //list of species names corresponding to the species vector
+
+            //make vector of the standard state energies of each species
+            double[] standardStateEnergies = new double[species.Count()];
+            for(int i=0; i<species.Count(); i++)
+            {
+                string speciesName = speciesList[i].Key;
+                double[] a = Species.properties[speciesName].a;
+                double[] b = Species.properties[speciesName].b;
+                double entropy = Species.ThermodynamicProperties(a, b, tempK).entropy;
+                double enthalpy = Species.ThermodynamicProperties(a, b, tempK).enthalpy;
+                standardStateEnergies[i] = enthalpy - tempK*entropy;
+            }
+
+            //make vector giving the mole fraction of each species out of the total
+            double total = 0;
+            foreach(double mole in species)
+            {
+                total += mole;
+            }
+            double[] moleFractions = new double[species.Count()];
+            for(int i=0; i<moleFractions.Count(); i++)
+            {
+                moleFractions[i] = species[i] / total;
+            }
+
+            //make vector of the chemical potential of each species
+            double[] chemicalPotentials = new double[species.Count()];
+            for(int i=0; i<species.Count(); i++)
+            {
+                moleFractions[i] = Math.Max(moleFractions[i], 0.0001); //cant be zero; number wont matter anyway
+                chemicalPotentials[i] = standardStateEnergies[i] + R * tempK * Math.Log(moleFractions[i] * (pressurePa/referencePressure));
+            }
+
+            //add up the product of the amount of each species and its chemical potential to find the total gibbs free energy
+            double energy = 0;
+            for(int i=0; i<species.Count(); i++)
+            {
+                energy += species[i] * chemicalPotentials[i];
+            }
+            return energy;
+        }
+        public static Vector<double> MinimizeGibbsEnergy(Vector<double> species, double pressurePa, double tempK)
+        {
+            double minimumChange = 0.001;
+            int maxIterations = 100;
+            Vector<double> currentAmounts = species.Clone();
+            for(int loop=0; loop<maxIterations; loop++)
+            {
+                double largestShift = 0;
+                for(int chemical=0; chemical<species.Count(); chemical++)
+                {
+                    Vector<double> tempAmounts = currentAmounts.Clone();
+                    double change = minimumChange;
+                    double direction = 0;
+
+                    //find direction to shift
+                    double beforeEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
+                    tempAmounts = Adjust(tempAmounts, chemical, tempAmounts[chemical]*change);
+
+                    double afterEnergy = 9999999;
+                    if(tempAmounts != null)
+                    {
+                        afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
+                    }
+
+                    if(afterEnergy < beforeEnergy)
+                    {
+                        direction = 1;
+                    }
+                    else
+                    {
+                        tempAmounts = currentAmounts.Clone();
+                        Debug.Log($"Loop {loop}");
+                        Debug.Log($"Chemical {chemical}");
+                        if(tempAmounts == null)
+                        {
+                            Debug.Log("Null!");
+                        }
+                        else
+                        {
+                            Debug.Log(tempAmounts[chemical]);
+                        }
+                        
+                        tempAmounts = Adjust(tempAmounts, chemical, -tempAmounts[chemical]*change);
+                        afterEnergy = 9999999;
+                        if(tempAmounts != null)
+                        {
+                            afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
+                        }
+
+                        if(afterEnergy < beforeEnergy)
+                        {
+                            direction = -1;
+                        }
+                        else
+                        {
+                            continue; //can't move in either direction, give up
+                        }
+                    }
+                    tempAmounts = currentAmounts.Clone();
+
+                    //find largest amount it can shift in that direction
+                    change = 0;
+                    for(double i = 0.1; i>=minimumChange; i*=0.1)
+                    {
+                        tempAmounts = Adjust(tempAmounts, chemical, tempAmounts[chemical] * direction * i);
+                        afterEnergy = 9999999;
+                        if(tempAmounts != null)
+                        {
+                            afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
+                            currentAmounts = tempAmounts.Clone();
+                        }
+                        else
+                        {
+                            tempAmounts = currentAmounts.Clone();
+                        }
+                        if(afterEnergy < beforeEnergy)
+                        {
+                            change = i;
+                            break;
+                        }
+                    }
+                    currentAmounts = tempAmounts.Clone();
+
+                    //report shift as largest if so
+                    Debug.Log(change);
+                    if(change > largestShift)
+                    {
+                        largestShift = change;
+                    }
+                }
+                if(largestShift < minimumChange)
+                {
+                    break;
+                }
+            }
+            return currentAmounts.Clone();
         }
     }
 }
