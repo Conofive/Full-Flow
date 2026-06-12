@@ -199,17 +199,13 @@ namespace CCEC
             return energy;
         }
 
-        //Note: seems to work most accurately and most swiftly with numbers around 10000000 so scale largest number in species to that.
+        //TODO: seems to work most accurately and most swiftly with numbers around 10000000 so scale largest number in species to that.
         public static Vector<double> MinimizeGibbsEnergy(Vector<double> species, double pressurePa, double tempK)
         {
-            System.Diagnostics.Stopwatch stopwatch2 = new System.Diagnostics.Stopwatch();
-            System.Diagnostics.Stopwatch stopwatch3 = new System.Diagnostics.Stopwatch();
-            double minimumChange = 0.1;
+            double minimumChange = 0.03;
+            //double minimumChange = 0.05;
             int maxIterations = 100;
             Vector<double> currentAmounts = species.Clone();
-            TimeSpan InnerLoopTime = TimeSpan.Zero; //DEBUG
-            TimeSpan OtherLoopTime = TimeSpan.Zero; //DEBUG
-            stopwatch3.Start();
 
             for(int loop=0; loop<maxIterations; loop++)
             {
@@ -221,9 +217,6 @@ namespace CCEC
                     double direction = 0;
                     double beforeEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
                     double afterEnergy = 1e50;
-
-                    stopwatch2.Reset();
-                    stopwatch2.Start();
 
                     //find direction to shift
                     tempAmounts = Adjust(tempAmounts, chemical, tempAmounts[chemical]*change);
@@ -254,20 +247,13 @@ namespace CCEC
                         }
                         else
                         {
-                            stopwatch2.Stop();
-                            OtherLoopTime += stopwatch2.Elapsed;
                             continue; //can't move in either direction, give up
                         }
                     }
                     tempAmounts = currentAmounts.Clone();
-                    stopwatch2.Stop();
-                    OtherLoopTime += stopwatch2.Elapsed;
                     
                     //find largest amount it can shift in that direction
                     change = 0;
-                    System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-                    stopwatch.Reset();
-                    stopwatch.Start();
                     for(double i = 0.1; i>=minimumChange; i*=0.5)
                     {
                         tempAmounts = Adjust(tempAmounts, chemical, tempAmounts[chemical] * direction * i);
@@ -288,8 +274,6 @@ namespace CCEC
                         }
                     }
                     currentAmounts = tempAmounts.Clone();
-                    stopwatch.Stop();
-                    InnerLoopTime += stopwatch.Elapsed;
 
                     //report shift as largest if so
                     if(change > largestShift)
@@ -302,11 +286,51 @@ namespace CCEC
                     break;
                 }
             }
-            Debug.Log($"Inner loop: {InnerLoopTime}");
-            Debug.Log($"Other: {OtherLoopTime}");
-            Debug.Log($"Total time: {stopwatch3.Elapsed}");
-            Debug.Log($"Unaccounted time: {stopwatch3.Elapsed - InnerLoopTime - OtherLoopTime}");
             return currentAmounts.Clone();
+        }
+        public static (Vector<double> species, double tempK) SolveChemistry(Vector<double> species, double pressurePa)
+        {
+            //scale largest number to 10000000
+            double largestValue = 0;
+            for(int i=0; i<species.Count(); i++)
+            {
+                if(species[i] > largestValue)
+                {
+                    largestValue = species[i];
+                }
+            }
+            double scaleFactor = 10000000/largestValue;
+            Vector<double> reactants = species * scaleFactor;
+
+            int iterations = 8;
+            double minTempK = 1000;
+            double maxTempK = 6000;
+            double tempK = minTempK + (maxTempK - minTempK)/2;
+            double reactantEnthalpy = 0;
+            for(int i=0; i<reactants.Count(); i++)
+            {
+                reactantEnthalpy += Species.ThermodynamicProperties(a[i], b[i], 273).enthalpy * reactants[i]; //TODO: assumes reactants are 273 degrees; bad
+            }
+            Vector<double> products = null;
+            for(int j=0; j<iterations; j++)
+            {
+                double productEnthalpy = 0;
+                products = MinimizeGibbsEnergy(reactants, pressurePa, tempK);
+                for(int i=0; i<products.Count(); i++)
+                {
+                    productEnthalpy += Species.ThermodynamicProperties(a[i], b[i], tempK).enthalpy * products[i];
+                }
+                double deltaH = productEnthalpy - reactantEnthalpy;
+                if(deltaH < 0)
+                {
+                    tempK += (maxTempK - minTempK) / Math.Pow(2, 2+j);
+                }
+                else
+                {
+                    tempK -= (maxTempK - minTempK) / Math.Pow(2, 2+j);
+                }
+            }
+            return (products, tempK);
         }
     }
 }

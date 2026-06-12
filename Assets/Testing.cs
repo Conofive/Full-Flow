@@ -13,9 +13,12 @@ public class Testing : MonoBehaviour
         {
             BData[i] = 0;
         }
-        BData[2] = 12000000;
-        BData[0] = 26000000;
-        BData[6] = 16000000;
+
+        //BData[12] = 1;
+        //BData[6] = 2;
+        
+        BData[1] = 2;
+        BData[6] = 1;
 
         Matrix<double> A = LinearAlgebra.A;
         Vector<double> B = Vector<double>.Build.DenseOfArray(BData);
@@ -36,7 +39,9 @@ public class Testing : MonoBehaviour
 
         System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
         stopwatch.Start();
-        B = ChemicalAdjuster.MinimizeGibbsEnergy(B, 9700000, 3488);
+        (Vector<double> species, double tempK) data = ChemicalAdjuster.SolveChemistry(B, 9700000);
+        B =data.species;
+        double temperature = data.tempK;
         stopwatch.Stop();
         
         Debug.Log("Species Amounts After:");
@@ -66,6 +71,7 @@ public class Testing : MonoBehaviour
                 Debug.Log($"{list[i].Key}: {B[i]/totalMoles}");
             }
         }
+        Debug.Log($"Combustion temperature of {temperature}K");
         Debug.Log($"{stopwatch.Elapsed} elapsed");
     }
 
