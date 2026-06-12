@@ -13,9 +13,9 @@ public class Testing : MonoBehaviour
         {
             BData[i] = 0;
         }
-        BData[0] = 26;
-        BData[2] = 12;
-        BData[6] = 10;
+        BData[2] = 12000000;
+        BData[0] = 26000000;
+        BData[6] = 16000000;
 
         Matrix<double> A = LinearAlgebra.A;
         Vector<double> B = Vector<double>.Build.DenseOfArray(BData);
@@ -34,7 +34,10 @@ public class Testing : MonoBehaviour
         Debug.Log($"O: {elements[3]}");
         Debug.Log($"F: {elements[4]}");
 
-        B = ChemicalAdjuster.MinimizeGibbsEnergy(B, 9700000, 3277);
+        System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+        stopwatch.Start();
+        B = ChemicalAdjuster.MinimizeGibbsEnergy(B, 9700000, 3488);
+        stopwatch.Stop();
         
         Debug.Log("Species Amounts After:");
         for(int i=0; i<B.Count(); i++)
@@ -58,8 +61,12 @@ public class Testing : MonoBehaviour
         }
         for(int i=0; i<B.Count(); i++)
         {
-            Debug.Log($"{list[i].Key}: {B[i]/totalMoles}");
+            if(B[i] > 0)
+            {
+                Debug.Log($"{list[i].Key}: {B[i]/totalMoles}");
+            }
         }
+        Debug.Log($"{stopwatch.Elapsed} elapsed");
     }
 
     void Update()

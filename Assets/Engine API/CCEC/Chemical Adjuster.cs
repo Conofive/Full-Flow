@@ -141,22 +141,32 @@ namespace CCEC
             return cleaned;
         }
 
+        static double[][] a;
+        static double[][] b;
+        static ChemicalAdjuster()
+        {
+            var speciesList = Species.properties.ToList();
+            a = new double[speciesList.Count()][];
+            b = new double[speciesList.Count()][];
+            for(int i=0; i<speciesList.Count(); i++)
+            {
+                string speciesName = speciesList[i].Key;
+                a[i] = Species.properties[speciesName].a;
+                b[i] = Species.properties[speciesName].b;
+            }
+        }
+
         static double ComputeEnergy(Vector<double> species, double pressurePa, double tempK)
         {
             double R = 8.314462618; //gas constant
             double referencePressure = 101325; //1 atmosphere
 
-            var speciesList = Species.properties.ToList(); //list of species names corresponding to the species vector
-
             //make vector of the standard state energies of each species
             double[] standardStateEnergies = new double[species.Count()];
             for(int i=0; i<species.Count(); i++)
             {
-                string speciesName = speciesList[i].Key;
-                double[] a = Species.properties[speciesName].a;
-                double[] b = Species.properties[speciesName].b;
-                double entropy = Species.ThermodynamicProperties(a, b, tempK).entropy;
-                double enthalpy = Species.ThermodynamicProperties(a, b, tempK).enthalpy;
+                double entropy = Species.ThermodynamicProperties(a[i], b[i], tempK).entropy;
+                double enthalpy = Species.ThermodynamicProperties(a[i], b[i], tempK).enthalpy;
                 standardStateEnergies[i] = enthalpy - tempK*entropy;
             }
 
@@ -188,11 +198,19 @@ namespace CCEC
             }
             return energy;
         }
+
+        //Note: seems to work most accurately and most swiftly with numbers around 10000000 so scale largest number in species to that.
         public static Vector<double> MinimizeGibbsEnergy(Vector<double> species, double pressurePa, double tempK)
         {
-            double minimumChange = 0.001;
+            System.Diagnostics.Stopwatch stopwatch2 = new System.Diagnostics.Stopwatch();
+            System.Diagnostics.Stopwatch stopwatch3 = new System.Diagnostics.Stopwatch();
+            double minimumChange = 0.1;
             int maxIterations = 100;
             Vector<double> currentAmounts = species.Clone();
+            TimeSpan InnerLoopTime = TimeSpan.Zero; //DEBUG
+            TimeSpan OtherLoopTime = TimeSpan.Zero; //DEBUG
+            stopwatch3.Start();
+
             for(int loop=0; loop<maxIterations; loop++)
             {
                 double largestShift = 0;
@@ -201,12 +219,15 @@ namespace CCEC
                     Vector<double> tempAmounts = currentAmounts.Clone();
                     double change = minimumChange;
                     double direction = 0;
+                    double beforeEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
+                    double afterEnergy = 1e50;
+
+                    stopwatch2.Reset();
+                    stopwatch2.Start();
 
                     //find direction to shift
-                    double beforeEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
                     tempAmounts = Adjust(tempAmounts, chemical, tempAmounts[chemical]*change);
-
-                    double afterEnergy = 9999999;
+                    afterEnergy = 1e50;
                     if(tempAmounts != null)
                     {
                         afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
@@ -219,19 +240,9 @@ namespace CCEC
                     else
                     {
                         tempAmounts = currentAmounts.Clone();
-                        Debug.Log($"Loop {loop}");
-                        Debug.Log($"Chemical {chemical}");
-                        if(tempAmounts == null)
-                        {
-                            Debug.Log("Null!");
-                        }
-                        else
-                        {
-                            Debug.Log(tempAmounts[chemical]);
-                        }
                         
                         tempAmounts = Adjust(tempAmounts, chemical, -tempAmounts[chemical]*change);
-                        afterEnergy = 9999999;
+                        afterEnergy = 1e50;
                         if(tempAmounts != null)
                         {
                             afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
@@ -243,14 +254,21 @@ namespace CCEC
                         }
                         else
                         {
+                            stopwatch2.Stop();
+                            OtherLoopTime += stopwatch2.Elapsed;
                             continue; //can't move in either direction, give up
                         }
                     }
                     tempAmounts = currentAmounts.Clone();
-
+                    stopwatch2.Stop();
+                    OtherLoopTime += stopwatch2.Elapsed;
+                    
                     //find largest amount it can shift in that direction
                     change = 0;
-                    for(double i = 0.1; i>=minimumChange; i*=0.1)
+                    System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+                    stopwatch.Reset();
+                    stopwatch.Start();
+                    for(double i = 0.1; i>=minimumChange; i*=0.5)
                     {
                         tempAmounts = Adjust(tempAmounts, chemical, tempAmounts[chemical] * direction * i);
                         afterEnergy = 9999999;
@@ -270,9 +288,10 @@ namespace CCEC
                         }
                     }
                     currentAmounts = tempAmounts.Clone();
+                    stopwatch.Stop();
+                    InnerLoopTime += stopwatch.Elapsed;
 
                     //report shift as largest if so
-                    Debug.Log(change);
                     if(change > largestShift)
                     {
                         largestShift = change;
@@ -283,6 +302,10 @@ namespace CCEC
                     break;
                 }
             }
+            Debug.Log($"Inner loop: {InnerLoopTime}");
+            Debug.Log($"Other: {OtherLoopTime}");
+            Debug.Log($"Total time: {stopwatch3.Elapsed}");
+            Debug.Log($"Unaccounted time: {stopwatch3.Elapsed - InnerLoopTime - OtherLoopTime}");
             return currentAmounts.Clone();
         }
     }
