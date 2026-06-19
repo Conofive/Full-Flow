@@ -9,24 +9,52 @@ public class Testing : MonoBehaviour
     {
         var list = Species.properties.ToList();
         double[] BData = new double[Species.properties.Count];
-        for(int i=0; i<Species.properties.Count; i++)
-        {
-            BData[i] = 0;
-        }
+        double[] reactantTemperature = new double[Species.properties.Count()];
 
-        //BData[12] = 1;
+        //CH4 - O2
+        //BData[10] = 1;
+        //reactantTemperature[10] = 300;
         //BData[6] = 2;
+        //reactantTemperature[6] = 90;
         
+        //H2 - O2
         BData[1] = 2;
+        reactantTemperature[1] = 300;
         BData[6] = 1;
+        reactantTemperature[6] = 90;
 
-        Matrix<double> A = LinearAlgebra.A;
+        //H2 - O2 J2
+        //BData[1] = 1;
+        //reactantTemperature[1] = 300;
+        //BData[6] = 0.3394;
+        //reactantTemperature[6] = 90;
+
+        //H2 - F2
+        //BData[1] = 1;
+        //reactantTemperature[1] = 300;
+        //BData[9] = 1;
+        //reactantTemperature[9] = 90;
+
+        //Aerozine50 - N2O4
+        //BData[11] = 0.278;
+        //reactantTemperature[11] = 298.15;
+        //BData[10] = 0.296;
+        //reactantTemperature[10] = 298.15;
+        //BData[4] = 0.148;
+        //reactantTemperature[4] = 298.15;
+        //BData[33] = 0.574;
+        //reactantTemperature[33] = 298.15;
+
+        Matrix<double> A = ChemicalAdjuster.A;
         Vector<double> B = Vector<double>.Build.DenseOfArray(BData);
 
         Debug.Log("Species Amounts Before:");
         for(int i=0; i<B.Count(); i++)
         {
-            Debug.Log($"{list[i].Key}: {B[i]}");
+            if(B[i] > 0)
+            {
+                Debug.Log($"{list[i].Key}: {B[i]}");
+            }
         }
 
         Debug.Log("Element Amounts Before:");
@@ -39,7 +67,7 @@ public class Testing : MonoBehaviour
 
         System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
         stopwatch.Start();
-        (Vector<double> species, double tempK) data = ChemicalAdjuster.SolveChemistry(B, 9700000);
+        (Vector<double> species, double tempK) data = ChemicalAdjuster.SolveChemistry(B, 9700000, reactantTemperature);
         B =data.species;
         double temperature = data.tempK;
         stopwatch.Stop();
@@ -47,7 +75,10 @@ public class Testing : MonoBehaviour
         Debug.Log("Species Amounts After:");
         for(int i=0; i<B.Count(); i++)
         {
-            Debug.Log($"{list[i].Key}: {B[i]}");
+            if(B[i] > 0)
+            {
+                Debug.Log($"{list[i].Key}: {B[i]}");
+            }
         }
 
         Debug.Log("Element Amounts After:");
@@ -73,30 +104,11 @@ public class Testing : MonoBehaviour
         }
         Debug.Log($"Combustion temperature of {temperature}K");
         Debug.Log($"{stopwatch.Elapsed} elapsed");
+
     }
 
     void Update()
     {
         
-    }
-
-    void PrintSpeciesInfo(string species)
-    {
-        Debug.Log($"Species {species}:");
-        Debug.Log($"H:{Species.properties[species].H}");
-        Debug.Log($"C:{Species.properties[species].C}");
-        Debug.Log($"N:{Species.properties[species].N}");
-        Debug.Log($"O:{Species.properties[species].O}");
-        Debug.Log($"F:{Species.properties[species].F}");
-        Debug.Log($"Molecular Mass: {Species.properties[species].molecularMass}");
-        Debug.Log($"a1: {Species.properties[species].a[0]}");
-        Debug.Log($"a2: {Species.properties[species].a[1]}");
-        Debug.Log($"a3: {Species.properties[species].a[2]}");
-        Debug.Log($"a4: {Species.properties[species].a[3]}");
-        Debug.Log($"a5: {Species.properties[species].a[4]}");
-        Debug.Log($"a6: {Species.properties[species].a[5]}");
-        Debug.Log($"a7: {Species.properties[species].a[6]}");
-        Debug.Log($"b1: {Species.properties[species].b[0]}");
-        Debug.Log($"b2: {Species.properties[species].b[1]}");
     }
 }

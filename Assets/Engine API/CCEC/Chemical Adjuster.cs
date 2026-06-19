@@ -12,9 +12,12 @@ namespace CCEC
 {
     public static class ChemicalAdjuster
     {
+        static double R = 8.314462618; //gas constant
+        public static Matrix<double> A;
+
         public static Vector<double> Adjust(Vector<double> amounts, int index, double change) //the species amounts, the species to change, and how much to change it by.
         {
-            Matrix<double> elementMatrix = LinearAlgebra.A;
+            Matrix<double> elementMatrix = A;
             double tolerance = 1e-5;
             int maxIterations = 1000;
 
@@ -143,22 +146,47 @@ namespace CCEC
 
         static double[][] a;
         static double[][] b;
+        static double[][] aLow;
+        static double[][] bLow;
+        static double[] molarMasses;
         static ChemicalAdjuster()
         {
             var speciesList = Species.properties.ToList();
             a = new double[speciesList.Count()][];
             b = new double[speciesList.Count()][];
+            aLow = new double[speciesList.Count()][];
+            bLow = new double[speciesList.Count()][];
             for(int i=0; i<speciesList.Count(); i++)
             {
                 string speciesName = speciesList[i].Key;
                 a[i] = Species.properties[speciesName].a;
                 b[i] = Species.properties[speciesName].b;
+                aLow[i] = Species.propertiesLowTemp[speciesName].a;
+                bLow[i] = Species.propertiesLowTemp[speciesName].b;
             }
+            molarMasses = new double[speciesList.Count()];
+            for(int i=0; i<speciesList.Count(); i++)
+            {
+                string speciesName = speciesList[i].Key;
+                molarMasses[i] = Species.properties[speciesName].molecularMass;
+            }
+            double[,] atomData = new double[5, Species.properties.Count]; //rows are elements HCNOF, collumns are the species
+            //fill atomData
+            var list = Species.properties.ToList();
+            for(int c=0; c<Species.properties.Count; c++)
+            {
+                atomData[0, c] = Species.properties[list[c].Key].H;
+                atomData[1, c] = Species.properties[list[c].Key].C;
+                atomData[2, c] = Species.properties[list[c].Key].N;
+                atomData[3, c] = Species.properties[list[c].Key].O;
+                atomData[4, c] = Species.properties[list[c].Key].F;
+            }
+
+            A = Matrix<double>.Build.DenseOfArray(atomData); //matrix mapping species to their element counts
         }
 
         static double ComputeEnergy(Vector<double> species, double pressurePa, double tempK)
         {
-            double R = 8.314462618; //gas constant
             double referencePressure = 101325; //1 atmosphere
 
             //make vector of the standard state energies of each species
@@ -202,8 +230,8 @@ namespace CCEC
         //TODO: seems to work most accurately and most swiftly with numbers around 10000000 so scale largest number in species to that.
         public static Vector<double> MinimizeGibbsEnergy(Vector<double> species, double pressurePa, double tempK)
         {
-            double minimumChange = 0.03;
-            //double minimumChange = 0.05;
+            double minimumChange = 0.1;
+            //double minimumChange = 0.1;
             int maxIterations = 100;
             Vector<double> currentAmounts = species.Clone();
 
@@ -214,13 +242,12 @@ namespace CCEC
                 {
                     Vector<double> tempAmounts = currentAmounts.Clone();
                     double change = minimumChange;
-                    double direction = 0;
+                    double direction;
                     double beforeEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
                     double afterEnergy = 1e50;
 
                     //find direction to shift
                     tempAmounts = Adjust(tempAmounts, chemical, tempAmounts[chemical]*change);
-                    afterEnergy = 1e50;
                     if(tempAmounts != null)
                     {
                         afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
@@ -233,14 +260,16 @@ namespace CCEC
                     else
                     {
                         tempAmounts = currentAmounts.Clone();
-                        
-                        tempAmounts = Adjust(tempAmounts, chemical, -tempAmounts[chemical]*change);
                         afterEnergy = 1e50;
-                        if(tempAmounts != null)
+                        if(tempAmounts[chemical] > 10)
                         {
-                            afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
+                            tempAmounts = Adjust(tempAmounts, chemical, -tempAmounts[chemical]*change);
+                        
+                            if(tempAmounts != null)
+                            {
+                                afterEnergy = ComputeEnergy(tempAmounts, pressurePa, tempK);
+                            }
                         }
-
                         if(afterEnergy < beforeEnergy)
                         {
                             direction = -1;
@@ -286,9 +315,9 @@ namespace CCEC
                     break;
                 }
             }
-            return currentAmounts.Clone();
+            return currentAmounts;
         }
-        public static (Vector<double> species, double tempK) SolveChemistry(Vector<double> species, double pressurePa)
+        public static (Vector<double> species, double tempK) SolveChemistry(Vector<double> species, double pressurePa, double[] reactantTemperatures)
         {
             //scale largest number to 10000000
             double largestValue = 0;
@@ -299,18 +328,36 @@ namespace CCEC
                     largestValue = species[i];
                 }
             }
-            double scaleFactor = 10000000/largestValue;
+            double scaleFactor = 10000000d/largestValue;
             Vector<double> reactants = species * scaleFactor;
 
-            int iterations = 8;
-            double minTempK = 1000;
-            double maxTempK = 6000;
+            int iterations = 6;
+            double minTempK = 2500;
+            double maxTempK = 5000;
+
+            //more range but same accuracy; takes longer
+            //int iterations = 8;
+            //double minTempK = 1000;
+            //double maxTempK = 6000;
+            
             double tempK = minTempK + (maxTempK - minTempK)/2;
             double reactantEnthalpy = 0;
             for(int i=0; i<reactants.Count(); i++)
             {
-                reactantEnthalpy += Species.ThermodynamicProperties(a[i], b[i], 273).enthalpy * reactants[i]; //TODO: assumes reactants are 273 degrees; bad
+                if(reactantTemperatures[i] != 0)
+                {
+                    if(reactantTemperatures[i] >= 1000d)
+                    {
+                        reactantEnthalpy += Species.ThermodynamicProperties(a[i], b[i], reactantTemperatures[i]).enthalpy * reactants[i];
+                    }
+                    else
+                    {
+                        reactantEnthalpy += Species.ThermodynamicProperties(aLow[i], bLow[i], reactantTemperatures[i]).enthalpy * reactants[i];
+                    }
+                }
+                //Debug.Log($"Reactant {i}: {reactants[i]}, {reactantTemperatures[i]}K");
             }
+            //Debug.Log($"Reactant enthalpy = {reactantEnthalpy}");
             Vector<double> products = null;
             for(int j=0; j<iterations; j++)
             {
@@ -331,6 +378,38 @@ namespace CCEC
                 }
             }
             return (products, tempK);
+        }
+        public static (double gamma, double tempK, double meanMolarMass) ExhaustProperties(Vector<double> species, double pressurePa, double[] reactantTemperatures)
+        {
+            (Vector<double> species, double tempK) chemistry = SolveChemistry(species, pressurePa, reactantTemperatures);
+            Vector<double> products = chemistry.species;
+            double tempK = chemistry.tempK;
+
+            //normalize products
+            double totalMoles = 0;
+            for(int i=0; i<products.Count(); i++)
+            {
+                totalMoles += products[i];
+            }
+            products /= totalMoles;
+
+            double meanMolarMass = 0;
+            for(int i=0; i<products.Count(); i++)
+            {
+                meanMolarMass += products[i] * molarMasses[i];
+            }
+
+            double mixtureHeatCapacity = 0;
+            for(int i=0; i<products.Count(); i++)
+            {
+                mixtureHeatCapacity += products[i] * Species.ThermodynamicProperties(a[i], b[i], tempK).heatCapacity;
+            }
+
+            double specificGasConstant = R/meanMolarMass;
+
+            double heatAtVolume = mixtureHeatCapacity - specificGasConstant;
+            double gamma = mixtureHeatCapacity/heatAtVolume;
+            return (gamma, tempK, meanMolarMass);
         }
     }
 }
