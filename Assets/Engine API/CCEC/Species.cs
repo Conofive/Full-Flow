@@ -180,7 +180,7 @@ namespace CCEC
                 }
             }
 
-            //Doesn't work because sometimes the line starts with a negative and it ruins everything so i added the "+ add stuff"; zip ties
+            //Doesn't work because sometimes the line starts with a negative and it ruins everything so i added the "+ add stuff"; zip ties ts
             string[] dataString = new string[9];
             int add = 0;
             if(textLines[dataLine][0] == '-')

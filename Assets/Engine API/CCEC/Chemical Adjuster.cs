@@ -405,9 +405,34 @@ namespace CCEC
                 mixtureHeatCapacity += products[i] * Species.ThermodynamicProperties(a[i], b[i], tempK).heatCapacity;
             }
 
-            double specificGasConstant = R/meanMolarMass;
+            double heatAtVolume = mixtureHeatCapacity - R;
+            double gamma = mixtureHeatCapacity/heatAtVolume;
+            return (gamma, tempK, meanMolarMass);
+        }
 
-            double heatAtVolume = mixtureHeatCapacity - specificGasConstant;
+        public static (double gamma, double tempK, double meanMolarMass) ExhaustProperties(Vector<double> products, double tempK)
+        {
+            //normalize products
+            double totalMoles = 0;
+            for(int i=0; i<products.Count(); i++)
+            {
+                totalMoles += products[i];
+            }
+            products /= totalMoles;
+
+            double meanMolarMass = 0;
+            for(int i=0; i<products.Count(); i++)
+            {
+                meanMolarMass += products[i] * molarMasses[i];
+            }
+
+            double mixtureHeatCapacity = 0;
+            for(int i=0; i<products.Count(); i++)
+            {
+                mixtureHeatCapacity += products[i] * Species.ThermodynamicProperties(a[i], b[i], tempK).heatCapacity;
+            }
+
+            double heatAtVolume = mixtureHeatCapacity - R;
             double gamma = mixtureHeatCapacity/heatAtVolume;
             return (gamma, tempK, meanMolarMass);
         }
